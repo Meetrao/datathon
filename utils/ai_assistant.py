@@ -315,14 +315,27 @@ class AIAssistantEngine:
             }
 
         # General RAG Grounded Answer Fallback
-        c_info = rag_citations[0]['chunk']['content'] if rag_citations else "Dataset verified with structured schemas."
+        c_info = rag_citations[0]['chunk']['content'] if rag_citations else ""
+        clean_info = re.sub(r'Ingestion utilized.*|Defensive cleaner purged.*|automated pipeline execution in.*', '', c_info).strip()
+        
+        fallback_text = (
+            f"### Dataset Analysis: `{query}`\n\n"
+            f"Analyzing **{len(self.df):,} rows** and **{len(self.df.columns)} columns** in the dataset.\n\n"
+        )
+        if clean_info:
+            fallback_text += f"**Key Dataset Profile & Context**:\n> {clean_info}\n\n"
+            
+        fallback_text += (
+            f"You can ask me to:\n"
+            f"• Filter specific subsets (e.g. *'show orders above 5000'* or *'patients with asthma'*)\n"
+            f"• View accuracy & health metrics (*'what is the accuracy of the dataset'*)\n"
+            f"• Calculate averages and totals (*'average {matched_num_col}'*)\n"
+            f"• Generate interactive visualizations (*'plot scatter of numeric features'*)\n"
+            f"• Rank top categories (*'top {matched_cat_col} by {matched_num_col}'*)"
+        )
+
         return {
-            'text': f"### Telemetry Query Synthesis\n"
-                    f"**Analysis on `{query}`**:\n\n"
-                    f"The dataset contains **{len(self.df):,} rows** and **{len(self.df.columns)} features**. "
-                    f"Relevant telemetry context extracted from RAG index:\n\n"
-                    f"> *\"{c_info}\"*\n\n"
-                    f"You can ask for specific metrics (e.g. *'average {matched_num_col}'*), grouped rankings (e.g. *'top {matched_cat_col} by {matched_num_col}'*), or dynamic charts (e.g. *'plot distribution of {matched_num_col}'*).",
+            'text': fallback_text,
             'chart': None,
             'table': None,
             'rag_citations': rag_citations,

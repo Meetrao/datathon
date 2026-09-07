@@ -448,10 +448,10 @@ else:
                 pass
 
 # Clean Collapsible Settings
-with st.sidebar.expander("⚙️ Pipeline & Batch Settings", expanded=False):
+with st.sidebar.expander("Pipeline & Batch Settings", expanded=False):
     ingestion_mode = st.selectbox(
         "Ingestion Pipeline:",
-        ["⚡ High-Throughput Batch Stream (2GB Ready)", "Standard In-Memory Engine"]
+        ["High-Throughput Batch Stream (2GB Ready)", "Standard In-Memory Engine"]
     )
     batch_size_choice = 50000
     if "Batch Stream" in ingestion_mode:
@@ -464,7 +464,7 @@ with st.sidebar.expander("⚙️ Pipeline & Batch Settings", expanded=False):
     n_clusters_input = st.slider("Cluster Nodes (k)", min_value=2, max_value=6, value=4)
     contamination_input = st.slider("Contamination Alpha", min_value=0.01, max_value=0.15, value=0.05, step=0.01)
 
-with st.sidebar.expander("🔑 AI Assistant API Key (Optional)", expanded=False):
+with st.sidebar.expander("AI Assistant API Key (Optional)", expanded=False):
     custom_gemini_key = st.text_input("Gemini API Key:", type="password", placeholder="AIzaSy...", help="Optional: Enables Gemini 2.0 reasoning or leave blank for local offline engine.")
 
 if raw_df is not None:
@@ -1015,7 +1015,7 @@ with tab5:
         st.session_state['chat_messages'] = [
             {
                 'role': 'assistant',
-                'content': f"👋 Hello! I am your **InsightAnalyst AI Assistant**. I have analyzed **{selected_dataset_name}** ({len(cleaned_df):,} rows, {len(cleaned_df.columns)} features) and indexed its semantic knowledge vectors in our RAG memory.\n\nYou can ask me questions about metrics, anomalies, segment breakdowns, request custom charts, or ask for production Python/SQL code!",
+                'content': f"Hello! I am your **InsightAnalyst AI Assistant**. I have analyzed **{selected_dataset_name}** ({len(cleaned_df):,} rows, {len(cleaned_df.columns)} features) and indexed its semantic knowledge vectors in our RAG memory.\n\nYou can ask me questions about metrics, accuracy, anomalies, segment breakdowns, request custom charts, or ask for production Python/SQL code!",
                 'chart': None,
                 'table': None,
                 'code': None
@@ -1028,19 +1028,19 @@ with tab5:
     
     selected_quick_prompt = None
     with qp1:
-        if st.button("📊 Top Drivers by Revenue", use_container_width=True):
+        if st.button("Top Drivers by Revenue", use_container_width=True):
             selected_quick_prompt = "What are the top categories by revenue?"
     with qp2:
-        if st.button("📈 Plot Distribution", use_container_width=True):
+        if st.button("Plot Distribution", use_container_width=True):
             selected_quick_prompt = "Plot distribution of numeric features"
     with qp3:
-        if st.button("🚨 Identify Outliers", use_container_width=True):
+        if st.button("Identify Outliers", use_container_width=True):
             selected_quick_prompt = "Explain the anomalies and outlier risks in this dataset"
     with qp4:
-        if st.button("💡 Strategic Advice", use_container_width=True):
+        if st.button("Strategic Advice", use_container_width=True):
             selected_quick_prompt = "Provide strategic executive recommendations for this data"
     with qp5:
-        if st.button("💻 Generate SQL Code", use_container_width=True):
+        if st.button("Generate SQL Code", use_container_width=True):
             selected_quick_prompt = "Generate SQL query to group and aggregate top metrics"
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -1050,7 +1050,7 @@ with tab5:
         if msg['role'] == 'user':
             st.markdown(f"<div class='chat-user-msg'><b>You:</b><br>{msg['content']}</div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div class='chat-assistant-msg'><b>⚡ InsightAnalyst AI:</b><br>{msg['content']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='chat-assistant-msg'><b>InsightAnalyst AI:</b><br>{msg['content']}</div>", unsafe_allow_html=True)
             if msg.get('chart') is not None:
                 st.plotly_chart(msg['chart'], use_container_width=True)
             if msg.get('table') is not None:
@@ -1083,6 +1083,6 @@ with tab5:
         st.rerun()
 
     if len(st.session_state['chat_messages']) > 1:
-        if st.button("🗑️ Clear Conversation History", key="clear_chat_history_btn"):
+        if st.button("Clear Conversation History", key="clear_chat_history_btn"):
             st.session_state['chat_messages'] = [st.session_state['chat_messages'][0]]
             st.rerun()
