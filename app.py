@@ -857,33 +857,9 @@ with tab3:
         </div>
         """, unsafe_allow_html=True)
 
-    col_chart1, col_chart2 = st.columns(2)
-    with col_chart1:
-        if col_types['numeric']:
-            fig_num = plot_numeric_distribution(display_df, col_types['numeric'][0])
-            st.plotly_chart(fig_num, key="tab3_num_dist", use_container_width=True)
-    with col_chart2:
-        if col_types['categorical']:
-            fig_cat = plot_categorical_counts(display_df, col_types['categorical'][0])
-            st.plotly_chart(fig_cat, key="tab3_cat_counts", use_container_width=True)
-
-    col_chart3, col_chart4 = st.columns(2)
-    with col_chart3:
-        if col_types['date']:
-            num_target = col_types['numeric'][0] if col_types['numeric'] else None
-            fig_date = plot_date_trend(display_df, col_types['date'][0], num_target)
-            st.plotly_chart(fig_date, key="tab3_date_trend", use_container_width=True)
-        elif len(col_types['numeric']) >= 2:
-            fig_num2 = plot_numeric_distribution(display_df, col_types['numeric'][1])
-            st.plotly_chart(fig_num2, key="tab3_num_dist2", use_container_width=True)
-    with col_chart4:
-        if ml_results.get('correlation') and ml_results['correlation'].get('matrix') is not None:
-            fig_corr = plot_correlation_heatmap(ml_results['correlation']['matrix'])
-            st.plotly_chart(fig_corr, key="tab3_corr_heatmap", use_container_width=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Custom Chart Sandbox Card
+    # ---------------------------------------------------------
+    # Custom Interactive Visual Explorer Sandbox (Between Query & Charts)
+    # ---------------------------------------------------------
     with st.expander("Custom Interactive Visual Explorer Sandbox", expanded=False):
         all_columns = list(display_df.columns)
         numeric_columns = col_types.get('numeric', [])
@@ -914,6 +890,35 @@ with tab3:
 
         fig_custom = plot_custom_user_chart(display_df, custom_chart_type, custom_x, custom_y, custom_color, custom_agg, z_param)
         st.plotly_chart(fig_custom, key="custom_sandbox_chart", use_container_width=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ---------------------------------------------------------
+    # Dynamic Visual Charts Grid
+    # ---------------------------------------------------------
+    col_chart1, col_chart2 = st.columns(2)
+    with col_chart1:
+        if col_types['numeric']:
+            fig_num = plot_numeric_distribution(display_df, col_types['numeric'][0])
+            st.plotly_chart(fig_num, key="tab3_num_dist", use_container_width=True)
+    with col_chart2:
+        if col_types['categorical']:
+            fig_cat = plot_categorical_counts(display_df, col_types['categorical'][0])
+            st.plotly_chart(fig_cat, key="tab3_cat_counts", use_container_width=True)
+
+    col_chart3, col_chart4 = st.columns(2)
+    with col_chart3:
+        if col_types['date']:
+            num_target = col_types['numeric'][0] if col_types['numeric'] else None
+            fig_date = plot_date_trend(display_df, col_types['date'][0], num_target)
+            st.plotly_chart(fig_date, key="tab3_date_trend", use_container_width=True)
+        elif len(col_types['numeric']) >= 2:
+            fig_num2 = plot_numeric_distribution(display_df, col_types['numeric'][1])
+            st.plotly_chart(fig_num2, key="tab3_num_dist2", use_container_width=True)
+    with col_chart4:
+        if ml_results.get('correlation') and ml_results['correlation'].get('matrix') is not None:
+            fig_corr = plot_correlation_heatmap(ml_results['correlation']['matrix'])
+            st.plotly_chart(fig_corr, key="tab3_corr_heatmap", use_container_width=True)
 
 # =========================================================
 # TAB 4: MACHINE LEARNING INSIGHTS
