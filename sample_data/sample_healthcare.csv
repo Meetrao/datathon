@@ -1,0 +1,16 @@
+Patient_ID,Admission_Date,Age,Blood_Pressure,Cholesterol,Diagnosis,Hospital_Days
+PT-801,2025-03-01,65,140,240,Cardiology,5
+PT-802,2025-03-02,42,120,180,General,2
+PT-803,2025-03-02,42,120,180,General,2
+PT-804,2025-03-03,78,160,,Cardiology,12
+PT-805,2025-03-04,31,115,165,Orthopedics,1
+PT-806,2025-03-05,55,135,210,Neurology,4
+PT-807,2025-03-06,62,145,255,Cardiology,7
+PT-808,03/07/2025,28,110,150,General,1
+PT-809,2025-03-08,84,175,290,Cardiology,15
+PT-810,2025-03-09,49,128,195,Neurology,3
+PT-811,2025-03-10,53,132,205,Orthopedics,3
+PT-812,2025-03-11,70,155,270,Cardiology,9
+PT-813,2025-03-12,36,118,172,General,2
+PT-814,2025-03-14,60,138,225,Neurology,5
+PT-815,2025-03-15,25,108,145,General,1

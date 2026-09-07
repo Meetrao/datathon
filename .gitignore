@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+.idea/
+uploaded_datasets/last_uploaded_dataset.csv
+uploaded_datasets/last_uploaded_meta.txt
+uploaded_datasets/last_source.txt
