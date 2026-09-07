@@ -79,14 +79,37 @@ def run_ml_analysis(df: pd.DataFrame, col_types: dict, n_clusters: int = 4, cont
 
                 inertia_val = kmeans.inertia_
 
-                persona_titles = [
-                    "Enterprise High-LTV",
-                    "Discount Hunters",
-                    "Occasional Consumers",
-                    "Loyal Mid-Market",
-                    "New Growth Cohort",
-                    "At-Risk Segment"
-                ]
+                # Dynamic Data-Grounded Persona Generation
+                persona_titles = []
+                overall_means = X.mean()
+
+                for k in range(k_actual):
+                    cluster_mask = (cluster_labels == k)
+                    if cluster_mask.sum() > 0:
+                        c_mean = X[cluster_mask].mean()
+                        diffs = (c_mean - overall_means) / (overall_means.abs() + 1e-5)
+                        top_pos = diffs.idxmax()
+                        top_neg = diffs.idxmin()
+                        
+                        pos_val = c_mean[top_pos]
+                        if diffs[top_pos] > 0.15:
+                            if abs(pos_val) >= 100:
+                                p_title = f"High {top_pos} (Avg {pos_val:,.0f})"
+                            elif abs(pos_val) >= 1:
+                                p_title = f"High {top_pos} (Avg {pos_val:,.1f})"
+                            else:
+                                p_title = f"High {top_pos} (Avg {pos_val:.2f})"
+                        elif diffs[top_neg] < -0.15:
+                            neg_val = c_mean[top_neg]
+                            if abs(neg_val) >= 100:
+                                p_title = f"Low {top_neg} (Avg {neg_val:,.0f})"
+                            else:
+                                p_title = f"Low {top_neg} (Avg {neg_val:.2f})"
+                        else:
+                            p_title = f"Moderate {top_pos} Cohort"
+                    else:
+                        p_title = f"Cohort {k+1}"
+                    persona_titles.append(p_title)
 
                 # PCA 2D Reduction
                 pca = PCA(n_components=2)
