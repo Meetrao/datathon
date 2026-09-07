@@ -20,7 +20,7 @@ from utils.dashboard import (
     plot_custom_user_chart
 )
 from utils.summarizer import generate_executive_summary, generate_html_dossier
-from utils.query_engine import query_dataset
+from utils.query_engine import filter_dataset_by_nl
 
 # ---------------------------------------------------------
 # Page Config & Force Light Enterprise Theme Setup
@@ -559,6 +559,69 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# ---------------------------------------------------------
+# Natural-Language Query -> Live Filtered View Search Bar
+# ---------------------------------------------------------
+st.markdown("""
+<div style='background:#FFFFFF; border:1.5px solid #0284C7; border-radius:10px; padding:16px 20px; margin-bottom:20px; box-shadow:0 2px 6px rgba(2,132,199,0.06);'>
+    <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;'>
+        <div>
+            <span style='font-size:14px; font-weight:700; color:#0F172A;'>🔍 NATURAL-LANGUAGE LIVE DATA FILTER</span>
+            <span style='font-size:12px; color:#64748B; margin-left:8px;'>Type query to dynamically slice dataset in real-time</span>
+        </div>
+        <span class='status-chip-green'>LIVE DASHBOARD FILTER</span>
+    </div>
+""", unsafe_allow_html=True)
+
+if 'nl_filter_query' not in st.session_state:
+    st.session_state['nl_filter_query'] = ""
+
+p_col1, p_col2, p_col3, p_col4, p_col5 = st.columns([1.5, 1.5, 1.5, 1.5, 1])
+preset_clicked = None
+with p_col1:
+    if st.button("📍 West Region", key="preset_west_btn", use_container_width=True):
+        preset_clicked = "show me the West region"
+with p_col2:
+    if st.button("💰 Orders > ₹5000", key="preset_orders_btn", use_container_width=True):
+        preset_clicked = "orders above 5000"
+with p_col3:
+    if st.button("👩 Female Patients", key="preset_female_btn", use_container_width=True):
+        preset_clicked = "female patients"
+with p_col4:
+    if st.button("⚡ Discount > 0.1", key="preset_discount_btn", use_container_width=True):
+        preset_clicked = "discount greater than 0.1"
+with p_col5:
+    if st.button("🔄 Clear", key="preset_clear_btn", use_container_width=True):
+        st.session_state['nl_filter_query'] = ""
+        st.rerun()
+
+if preset_clicked:
+    st.session_state['nl_filter_query'] = preset_clicked
+
+user_nl_filter = st.text_input(
+    "Natural-Language Query Search Bar:",
+    value=st.session_state['nl_filter_query'],
+    key="nl_filter_query_input",
+    placeholder="e.g. 'show me the West region', 'orders above ₹5000', 'female patients', 'sales under 1000'..."
+)
+
+filter_result = filter_dataset_by_nl(cleaned_df, col_types, user_nl_filter)
+display_df = filter_result['filtered_df']
+
+if filter_result['applied_rules']:
+    st.markdown(f"""
+    <div style='background:#E0F2FE; border:1px solid #7DD3FC; border-radius:6px; padding:10px 14px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;'>
+        <div>
+            <b style='color:#0369A1;'>FILTER ACTIVE:</b> <span style='color:#0F172A; font-size:13px;'>{filter_result['summary']}</span>
+        </div>
+        <div>
+            <span class='badge-num'>FILTERED {filter_result['filtered_count']:,} / {filter_result['original_count']:,} ROWS ({filter_result['percentage']}%)</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
 # Main Dashboard Navigation Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Executive Summary (RAG Grounded)",
@@ -853,25 +916,25 @@ with tab2:
 
     # 5. CLEANED DATA PREVIEW & EXPORTS
     st.markdown("<h4 style='color:#0F172A;'>Cleaned Data Preview & Multi-Format Export</h4>", unsafe_allow_html=True)
-    st.dataframe(cleaned_df.head(25), use_container_width=True)
+    st.dataframe(display_df.head(25), use_container_width=True)
     
     exp_col1, exp_col2 = st.columns([1, 1])
     with exp_col1:
-        csv_data = cleaned_df.to_csv(index=False).encode('utf-8')
+        csv_data = display_df.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Download Cleaned Dataset (.CSV)",
+            label="📥 Download Filtered Dataset (.CSV)",
             data=csv_data,
-            file_name=f"cleaned_{selected_dataset_name}.csv",
+            file_name=f"filtered_{selected_dataset_name}.csv",
             mime="text/csv",
             key="dl_cleaned_csv_btn"
         )
     with exp_col2:
         try:
-            parquet_data = cleaned_df.to_parquet(index=False)
+            parquet_data = display_df.to_parquet(index=False)
             st.download_button(
-                label="⚡ Download Cleaned Dataset (.Parquet)",
+                label="⚡ Download Filtered Dataset (.Parquet)",
                 data=parquet_data,
-                file_name=f"cleaned_{selected_dataset_name}.parquet",
+                file_name=f"filtered_{selected_dataset_name}.parquet",
                 mime="application/octet-stream",
                 key="dl_cleaned_parquet_btn"
             )
@@ -883,28 +946,28 @@ with tab2:
 # =========================================================
 with tab3:
     st.markdown("<h2 style='color:#0F172A; font-weight:800;'>Adaptive Visual Dashboard Engine</h2>", unsafe_allow_html=True)
-    st.markdown("<span style='color:#475569; font-size:13px;'>Plotly WebGL Engine · <b>4 Plots Rendered Dynamically</b> · Zero-Copy Synced</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='color:#475569; font-size:13px;'>Plotly WebGL Engine · <b>4 Plots Rendered Dynamically ({len(display_df):,} rows active)</b> · Zero-Copy Synced</span>", unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
 
     col_chart1, col_chart2 = st.columns(2)
     with col_chart1:
         if col_types['numeric']:
-            fig_num = plot_numeric_distribution(cleaned_df, col_types['numeric'][0])
+            fig_num = plot_numeric_distribution(display_df, col_types['numeric'][0])
             st.plotly_chart(fig_num, key="tab3_num_dist", use_container_width=True)
     with col_chart2:
         if col_types['categorical']:
-            fig_cat = plot_categorical_counts(cleaned_df, col_types['categorical'][0])
+            fig_cat = plot_categorical_counts(display_df, col_types['categorical'][0])
             st.plotly_chart(fig_cat, key="tab3_cat_counts", use_container_width=True)
 
     col_chart3, col_chart4 = st.columns(2)
     with col_chart3:
         if col_types['date']:
             num_target = col_types['numeric'][0] if col_types['numeric'] else None
-            fig_date = plot_date_trend(cleaned_df, col_types['date'][0], num_target)
+            fig_date = plot_date_trend(display_df, col_types['date'][0], num_target)
             st.plotly_chart(fig_date, key="tab3_date_trend", use_container_width=True)
         elif len(col_types['numeric']) >= 2:
-            fig_num2 = plot_numeric_distribution(cleaned_df, col_types['numeric'][1])
+            fig_num2 = plot_numeric_distribution(display_df, col_types['numeric'][1])
             st.plotly_chart(fig_num2, key="tab3_num_dist2", use_container_width=True)
     with col_chart4:
         if ml_results.get('correlation') and ml_results['correlation'].get('matrix') is not None:
@@ -916,7 +979,7 @@ with tab3:
     st.caption("Build custom on-demand visualizations beyond defaults by selecting features, chart archetypes, and aggregations.")
 
     sb_c1, sb_c2, sb_c3, sb_c4, sb_c5 = st.columns(5)
-    all_columns = list(cleaned_df.columns)
+    all_columns = list(display_df.columns)
     numeric_columns = col_types.get('numeric', [])
 
     with sb_c1:
@@ -950,7 +1013,7 @@ with tab3:
     if custom_chart_type == "3D Scatter Plot":
         z_param = st.selectbox("Z-Axis Feature (3D)", numeric_columns if numeric_columns else all_columns, key="custom_z")
 
-    fig_custom = plot_custom_user_chart(cleaned_df, custom_chart_type, custom_x, custom_y, custom_color, custom_agg, z_param)
+    fig_custom = plot_custom_user_chart(display_df, custom_chart_type, custom_x, custom_y, custom_color, custom_agg, z_param)
     st.plotly_chart(fig_custom, key="custom_sandbox_chart", use_container_width=True)
 
 # =========================================================

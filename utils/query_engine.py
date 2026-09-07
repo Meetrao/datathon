@@ -1,121 +1,160 @@
 import pandas as pd
 import numpy as np
+import re
 
-def query_dataset(df: pd.DataFrame, col_types: dict, user_query: str) -> dict:
+def filter_dataset_by_nl(df: pd.DataFrame, col_types: dict, user_query: str) -> dict:
     """
-    Parses natural language queries against the dataset and computes instant metric answers.
+    Parses natural-language queries into pandas boolean filtering conditions.
     Examples:
-    - 'top region by revenue' -> Highest Revenue region
-    - 'average customer age' -> Mean value of Age column
-    - 'total sales' -> Sum of Revenue column
-    - 'outlier count' -> Anomaly stats
+    - 'show me the West region' -> df['Region'].str.contains('West', case=False)
+    - 'orders above ₹5000' -> df['Sales'] > 5000
+    - 'sales under 1000' -> df['Sales'] < 1000
+    - 'female patients' -> df['Gender'].str.contains('Female', case=False)
+    - 'category equals Electronics' -> df['Category'].str.contains('Electronics', case=False)
     """
+    if df is None or df.empty:
+        return {
+            "query": user_query,
+            "filtered_df": df,
+            "original_count": 0,
+            "filtered_count": 0,
+            "percentage": 0.0,
+            "applied_rules": [],
+            "summary": "Empty dataset."
+        }
+
     if not user_query or not user_query.strip():
-        return None
+        return {
+            "query": "",
+            "filtered_df": df,
+            "original_count": len(df),
+            "filtered_count": len(df),
+            "percentage": 100.0,
+            "applied_rules": [],
+            "summary": f"Displaying full dataset ({len(df):,} rows)."
+        }
 
-    query_lower = user_query.lower().strip()
-    all_cols = list(df.columns)
-    numeric_cols = col_types.get('numeric', [])
-    categorical_cols = col_types.get('categorical', [])
+    query_raw = user_query.strip()
+    query_lower = query_raw.lower()
     
-    # 1. Search for matching column names in query
-    matched_num_col = None
-    for c in numeric_cols:
-        c_clean = c.lower().replace('_', ' ')
-        if c_clean in query_lower or any(word in query_lower for word in c_clean.split()):
-            matched_num_col = c
-            break
+    numeric_cols = col_types.get('numeric', [])
+    categorical_cols = col_types.get('categorical', []) + col_types.get('text', [])
+    
+    mask = pd.Series(True, index=df.index)
+    applied_rules = []
+    
+    # -------------------------------------------------------------------
+    # STEP 1: NUMERIC COMPARISON OPERATORS (above, below, greater, less, >, <, =, etc.)
+    # -------------------------------------------------------------------
+    num_op_regex = re.compile(
+        r'(?:([a-zA-Z0-9_\s]+)\s+)?'  # Optional column name before operator
+        r'(above|greater than|more than|over|>|>=|exceeding|higher than|below|less than|under|<|<=|lower than|smaller than|equal to|equals|=|==|is)\s*'
+        r'(?:[₹$€£]\s*)?'              # Optional currency symbol
+        r'([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)', # Numeric value
+        re.IGNORECASE
+    )
+    
+    matches = num_op_regex.findall(query_raw)
+    
+    matched_spans = []
+    for match in matches:
+        col_prefix, operator, num_str = match
+        num_val = float(num_str.replace(',', ''))
+        op_lower = operator.lower()
+        
+        # Determine target numeric column
+        target_col = None
+        if col_prefix and col_prefix.strip():
+            prefix_clean = col_prefix.strip().lower()
+            # Match against numeric columns
+            for nc in numeric_cols:
+                nc_clean = nc.lower().replace('_', ' ')
+                if nc_clean in prefix_clean or prefix_clean in nc_clean or any(w in nc_clean for w in prefix_clean.split()):
+                    target_col = nc
+                    break
+        
+        if not target_col:
+            # Look anywhere in query for a numeric column name
+            for nc in numeric_cols:
+                nc_clean = nc.lower().replace('_', ' ')
+                if nc_clean in query_lower:
+                    target_col = nc
+                    break
+        
+        # Fallback to first numeric column if none matched
+        if not target_col and numeric_cols:
+            target_col = numeric_cols[0]
+            
+        if target_col and target_col in df.columns:
+            if op_lower in ['above', 'greater than', 'more than', 'over', '>', '>=', 'exceeding', 'higher than']:
+                cond = df[target_col] > num_val
+                applied_rules.append(f"`{target_col}` > {num_val:,.2f}".rstrip('0').rstrip('.'))
+            elif op_lower in ['below', 'less than', 'under', '<', '<=', 'lower than', 'smaller than']:
+                cond = df[target_col] < num_val
+                applied_rules.append(f"`{target_col}` < {num_val:,.2f}".rstrip('0').rstrip('.'))
+            else:
+                cond = df[target_col] == num_val
+                applied_rules.append(f"`{target_col}` == {num_val:,.2f}".rstrip('0').rstrip('.'))
+                
+            mask = mask & cond
 
-    matched_cat_col = None
-    for c in categorical_cols:
-        c_clean = c.lower().replace('_', ' ')
-        if c_clean in query_lower or any(word in query_lower for word in c_clean.split()):
-            matched_cat_col = c
-            break
+    # -------------------------------------------------------------------
+    # STEP 2: CATEGORICAL / TEXT MATCHING (e.g., "West region", "female", "electronics")
+    # -------------------------------------------------------------------
+    # Clean query text by removing filler phrases
+    clean_text_query = re.sub(
+        r'\b(show me|filter|find|get|rows|where|display|the|dataset|records|with|that have|which have|list|all)\b',
+        '', query_lower, flags=re.IGNORECASE
+    ).strip()
+    
+    # Check categorical column values in df
+    found_cat_match = False
+    for cat_col in categorical_cols:
+        if cat_col in df.columns:
+            unique_vals = df[cat_col].dropna().unique()
+            for u_val in unique_vals:
+                u_val_str = str(u_val).strip()
+                if len(u_val_str) > 1 and u_val_str.lower() in clean_text_query:
+                    cond = df[cat_col].astype(str).str.contains(re.escape(u_val_str), case=False, na=False)
+                    mask = mask & cond
+                    applied_rules.append(f"`{cat_col}` == '{u_val_str}'")
+                    found_cat_match = True
 
-    # Default fallbacks if no exact col match
-    if not matched_num_col and numeric_cols:
-        matched_num_col = numeric_cols[0]
-    if not matched_cat_col and categorical_cols:
-        matched_cat_col = categorical_cols[0]
+    # -------------------------------------------------------------------
+    # STEP 3: FALLBACK FULL-TEXT SEARCH (if no specific filter matched)
+    # -------------------------------------------------------------------
+    if not applied_rules and clean_text_query:
+        # Search across all object/string columns
+        text_cols = [c for c in df.columns if df[c].dtype == 'object' or pd.api.types.is_string_dtype(df[c])]
+        if text_cols:
+            full_search_mask = pd.Series(False, index=df.index)
+            search_terms = clean_text_query.split()
+            for term in search_terms:
+                if len(term) > 2:
+                    for tc in text_cols:
+                        full_search_mask = full_search_mask | df[tc].astype(str).str.contains(re.escape(term), case=False, na=False)
+            
+            if full_search_mask.any():
+                mask = mask & full_search_mask
+                applied_rules.append(f"Text Search: '{clean_text_query}'")
 
-    # 2. INTENT CLASSIFICATION & AGGREGATION
-    # Intent A: Average / Mean
-    if any(kw in query_lower for kw in ['average', 'mean', 'avg']):
-        if matched_num_col:
-            val = df[matched_num_col].mean()
-            return {
-                "query": user_query,
-                "answer_title": f"Average {matched_num_col}",
-                "answer_val": f"{val:,.2f}",
-                "explanation": f"Computed mean across {len(df):,} non-null records in attribute '{matched_num_col}'."
-            }
+    # Apply final boolean mask
+    filtered_df = df[mask].reset_index(drop=True)
+    orig_len = len(df)
+    filt_len = len(filtered_df)
+    pct = round((filt_len / orig_len) * 100.0, 1) if orig_len > 0 else 0.0
 
-    # Intent B: Total / Sum
-    if any(kw in query_lower for kw in ['total', 'sum', 'overall', 'gross']):
-        if matched_num_col:
-            val = df[matched_num_col].sum()
-            return {
-                "query": user_query,
-                "answer_title": f"Total {matched_num_col}",
-                "answer_val": f"{val:,.2f}",
-                "explanation": f"Summed aggregate of '{matched_num_col}' across all dataset observations."
-            }
-
-    # Intent C: Top / Maximum / Highest Category Breakdown
-    if any(kw in query_lower for kw in ['top', 'highest', 'max', 'most', 'best', 'dominant']):
-        if matched_cat_col and matched_num_col:
-            grouped = df.groupby(matched_cat_col)[matched_num_col].sum().sort_values(ascending=False)
-            top_cat = grouped.index[0]
-            top_val = grouped.iloc[0]
-            return {
-                "query": user_query,
-                "answer_title": f"Top {matched_cat_col} by {matched_num_col}",
-                "answer_val": f"{top_cat} ({top_val:,.2f})",
-                "explanation": f"Ranked highest contribution segment in '{matched_cat_col}' grouped by '{matched_num_col}'."
-            }
-        elif matched_num_col:
-            max_val = df[matched_num_col].max()
-            return {
-                "query": user_query,
-                "answer_title": f"Maximum {matched_num_col}",
-                "answer_val": f"{max_val:,.2f}",
-                "explanation": f"Highest recorded value in numeric attribute '{matched_num_col}'."
-            }
-
-    # Intent D: Lowest / Minimum
-    if any(kw in query_lower for kw in ['lowest', 'min', 'minimum', 'smallest', 'worst']):
-        if matched_num_col:
-            min_val = df[matched_num_col].min()
-            return {
-                "query": user_query,
-                "answer_title": f"Minimum {matched_num_col}",
-                "answer_val": f"{min_val:,.2f}",
-                "explanation": f"Lowest recorded value in numeric attribute '{matched_num_col}'."
-            }
-
-    # Intent E: Count / Records
-    if any(kw in query_lower for kw in ['count', 'number', 'rows', 'records', 'how many']):
-        return {
-            "query": user_query,
-            "answer_title": "Total Dataset Volume",
-            "answer_val": f"{len(df):,} records",
-            "explanation": f"Cleaned observation count across {len(all_cols)} detected attributes."
-        }
-
-    # General Fallback Response
-    if matched_num_col:
-        val = df[matched_num_col].sum()
-        return {
-            "query": user_query,
-            "answer_title": f"Aggregate Telemetry ({matched_num_col})",
-            "answer_val": f"{val:,.2f}",
-            "explanation": f"Auto-computed total metric value for target attribute '{matched_num_col}'."
-        }
+    if applied_rules:
+        summary_str = f"Filtered view: **{filt_len:,}** of **{orig_len:,}** rows ({pct}%) matching {' and '.join(applied_rules)}."
+    else:
+        summary_str = f"No specific filter matched. Displaying full dataset ({orig_len:,} rows)."
 
     return {
         "query": user_query,
-        "answer_title": "Dataset Records Evaluated",
-        "answer_val": f"{len(df):,} rows",
-        "explanation": f"Executed zero-loss query scanning {len(df):,} observations."
+        "filtered_df": filtered_df,
+        "original_count": orig_len,
+        "filtered_count": filt_len,
+        "percentage": pct,
+        "applied_rules": applied_rules,
+        "summary": summary_str
     }
