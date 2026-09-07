@@ -530,7 +530,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-<<<<<<< HEAD
 # ---------------------------------------------------------
 # Natural-Language Query -> Live Filtered View Search Bar
 # ---------------------------------------------------------
@@ -595,9 +594,6 @@ if filter_result['applied_rules']:
 st.markdown("</div>", unsafe_allow_html=True)
 
 # Main Dashboard Navigation Tabs
-=======
-# Main Navigation Tabs
->>>>>>> origin/main
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Executive Summary",
     "🛡️ Data Audit & Cleaning",
@@ -944,28 +940,8 @@ with tab3:
         with sb_r2_c2:
             custom_agg = st.selectbox("Aggregation", ["Mean", "Sum", "Count", "Median"], key="custom_agg")
 
-        z_param = None
-        if custom_chart_type == "3D Scatter Plot":
-            z_param = st.selectbox("Z-Axis Feature (3D)", numeric_columns if numeric_columns else all_columns, key="custom_z")
-
-<<<<<<< HEAD
-    with sb_c4:
-        color_options = ["None"] + list(col_types.get('categorical', [])) + list(col_types.get('numeric', []))
-        custom_color = st.selectbox("Color / Group By", color_options, index=0, key="custom_color")
-
-    with sb_c5:
-        custom_agg = st.selectbox("Aggregation", ["Mean", "Sum", "Count", "Median"], key="custom_agg")
-
-    z_param = None
-    if custom_chart_type == "3D Scatter Plot":
-        z_param = st.selectbox("Z-Axis Feature (3D)", numeric_columns if numeric_columns else all_columns, key="custom_z")
-
-    fig_custom = plot_custom_user_chart(display_df, custom_chart_type, custom_x, custom_y, custom_color, custom_agg, z_param)
-    st.plotly_chart(fig_custom, key="custom_sandbox_chart", use_container_width=True)
-=======
-        fig_custom = plot_custom_user_chart(cleaned_df, custom_chart_type, custom_x, custom_y, custom_color, custom_agg, z_param)
+        fig_custom = plot_custom_user_chart(display_df, custom_chart_type, custom_x, custom_y, custom_color, custom_agg, z_param)
         st.plotly_chart(fig_custom, key="custom_sandbox_chart", use_container_width=True)
->>>>>>> origin/main
 
 # =========================================================
 # TAB 4: MACHINE LEARNING INSIGHTS
