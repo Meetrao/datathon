@@ -6,6 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from typing import Dict, Any, List, Optional
 from utils.rag_engine import DatasetRAGEngine
+from utils.query_engine import filter_dataset_by_nl
 
 class AIAssistantEngine:
     """
@@ -224,6 +225,57 @@ class AIAssistantEngine:
                 'table': None,
                 'rag_citations': rag_citations,
                 'code_snippet': code_str
+            }
+
+        # 6. INTENT: Natural-Language Data Filtering & Subset Retrieval (e.g. "give me patients with asthma")
+        filter_res = filter_dataset_by_nl(self.df, self.col_types, query)
+        if filter_res and filter_res.get('applied_rules'):
+            filt_df = filter_res['filtered_df']
+            filt_count = filter_res['filtered_count']
+            orig_count = filter_res['original_count']
+            pct = filter_res['percentage']
+            rules_str = " and ".join(filter_res['applied_rules'])
+            
+            num_summary_lines = []
+            for nc in numeric_cols[:4]:
+                if nc in filt_df.columns and not filt_df[nc].empty:
+                    mean_val = filt_df[nc].mean()
+                    min_val = filt_df[nc].min()
+                    max_val = filt_df[nc].max()
+                    num_summary_lines.append(f"• **`{nc}`**: Mean = `{mean_val:,.2f}`, Range = `[{min_val:,.2f} to {max_val:,.2f}]`")
+
+            stats_block = "\n".join(num_summary_lines) if num_summary_lines else ""
+            
+            resp_text = (
+                f"### Filtered Telemetry Query: `{query}`\n\n"
+                f"Isolated **{filt_count:,} matching records** out of **{orig_count:,} total rows** (**{pct:.1f}%** of dataset).\n\n"
+                f"**Applied Filter Criteria**: {rules_str}\n\n"
+            )
+            if stats_block:
+                resp_text += f"**Cohort Metric Averages for Matched Subset**:\n{stats_block}\n\n"
+            
+            resp_text += f"Displaying top matching records below:"
+
+            fig = None
+            if len(numeric_cols) >= 1 and len(filt_df) > 1:
+                try:
+                    target_num = numeric_cols[0]
+                    fig = px.histogram(
+                        filt_df, x=target_num, nbins=20,
+                        title=f"Filtered Cohort Distribution ({target_num})",
+                        template="plotly_white",
+                        color_discrete_sequence=["#0284C7"]
+                    )
+                    fig.update_layout(margin=dict(l=30, r=30, t=50, b=30), height=320)
+                except Exception:
+                    pass
+
+            return {
+                'text': resp_text,
+                'chart': fig,
+                'table': filt_df.head(50),
+                'rag_citations': rag_citations,
+                'code_snippet': f"# Filter dataframe for query: '{query}'\nfilt_df = df[{rules_str}]"
             }
 
         # General RAG Grounded Answer Fallback
