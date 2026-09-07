@@ -9,7 +9,7 @@ from sklearn.metrics import silhouette_score
 
 def run_ml_analysis(df: pd.DataFrame, col_types: dict, n_clusters: int = 4, contamination: float = 0.05, *args, **kwargs) -> dict:
     """
-    Executes ML routines with detailed telemetry:
+    Executes ML routines with memory-safe sampling for large datasets (up to 2GB):
     - Pearson Correlation Matrix & Top Feature Co-Movements
     - KMeans Behavioral Clustering & 2D PCA Space with Silhouette Index
     - Isolation Forest Outlier Telemetry & Anomaly Drivers Table
@@ -31,17 +31,26 @@ def run_ml_analysis(df: pd.DataFrame, col_types: dict, n_clusters: int = 4, cont
         'clustering': None,
         'outliers': None,
         'execution_ms': "0.0 ms",
-        'status': 'success'
+        'status': 'success',
+        'is_sampled': False,
+        'sample_size': len(df)
     }
 
     if len(df) == 0:
         results['status'] = 'empty_dataframe'
         return results
 
+    # Memory Safety: Use representative sample if dataset > 50,000 rows for real-time responsiveness
+    working_df = df
+    if len(df) > 50000:
+        working_df = df.sample(n=50000, random_state=42)
+        results['is_sampled'] = True
+        results['sample_size'] = 50000
+
     # 1. CORRELATION ANALYSIS
     if len(numeric_cols) >= 2:
         try:
-            corr_df = df[numeric_cols].corr()
+            corr_df = working_df[numeric_cols].corr()
             results['correlation'] = {
                 'matrix': corr_df,
                 'top_pairs': _extract_top_correlation_pairs(corr_df)
@@ -50,32 +59,33 @@ def run_ml_analysis(df: pd.DataFrame, col_types: dict, n_clusters: int = 4, cont
             results['correlation_error'] = str(e)
 
     # 2. K-MEANS CLUSTERING & 2D PCA SPACE
-    if len(numeric_cols) >= 2 and len(df) >= 3:
+    if len(numeric_cols) >= 2 and len(working_df) >= 3:
         try:
-            X = df[numeric_cols].dropna()
+            X = working_df[numeric_cols].dropna()
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(X)
 
-            k_actual = min(n_clusters, len(df))
+            k_actual = min(n_clusters, len(X))
             if k_actual >= 2:
                 kmeans = KMeans(n_clusters=k_actual, random_state=42, n_init=10)
                 cluster_labels = kmeans.fit_predict(X_scaled)
                 
-                # Calculate Silhouette Index
+                # Calculate Silhouette Index on sample for instant speed
                 try:
-                    sil_score = silhouette_score(X_scaled, cluster_labels)
+                    sil_sample_idx = np.random.choice(len(X_scaled), min(2000, len(X_scaled)), replace=False)
+                    sil_score = silhouette_score(X_scaled[sil_sample_idx], cluster_labels[sil_sample_idx])
                 except Exception:
                     sil_score = 0.648
 
                 inertia_val = kmeans.inertia_
-                cluster_names = [f"Cluster {l}: Persona {l+1}" for l in cluster_labels]
 
-                # Persona Titles matching high-end UI
                 persona_titles = [
                     "Enterprise High-LTV",
                     "Discount Hunters",
                     "Occasional Consumers",
-                    "Loyal Mid-Market"
+                    "Loyal Mid-Market",
+                    "New Growth Cohort",
+                    "At-Risk Segment"
                 ]
 
                 # PCA 2D Reduction
@@ -113,9 +123,9 @@ def run_ml_analysis(df: pd.DataFrame, col_types: dict, n_clusters: int = 4, cont
             results['clustering_error'] = str(e)
 
     # 3. ISOLATION FOREST OUTLIER TELEMETRY
-    if len(numeric_cols) >= 1 and len(df) >= 5:
+    if len(numeric_cols) >= 1 and len(working_df) >= 5:
         try:
-            X_outlier = df[numeric_cols].copy().fillna(df[numeric_cols].median())
+            X_outlier = working_df[numeric_cols].copy().fillna(working_df[numeric_cols].median())
 
             iso_forest = IsolationForest(contamination=contamination, random_state=42)
             preds = iso_forest.fit_predict(X_outlier)
@@ -123,14 +133,18 @@ def run_ml_analysis(df: pd.DataFrame, col_types: dict, n_clusters: int = 4, cont
             is_anomaly = (preds == -1)
 
             anomaly_count = int(is_anomaly.sum())
-            anomaly_pct = (anomaly_count / len(df)) * 100
+            if results['is_sampled']:
+                # Scale anomaly estimate to total rows
+                total_scale = len(df) / max(1, len(working_df))
+                anomaly_count = int(anomaly_count * total_scale)
 
-            outlier_df = df.copy()
+            anomaly_pct = (anomaly_count / max(1, len(df))) * 100
+
+            outlier_df = working_df.copy()
             outlier_df['Anomaly_Score'] = anomaly_scores
             outlier_df['Is_Outlier'] = ['Isolated Anomaly' if a else 'Inlier' for a in is_anomaly]
 
-            # Generate sample telemetry table rows for detected outliers
-            anomaly_samples = outlier_df[outlier_df['Is_Outlier'] == 'Isolated Anomaly'].head(5)
+            anomaly_samples = outlier_df[outlier_df['Is_Outlier'] == 'Isolated Anomaly'].head(10)
 
             results['outliers'] = {
                 'count': anomaly_count,

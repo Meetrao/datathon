@@ -1,8 +1,11 @@
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .DS_Store
 .vscode/
 .idea/
-uploaded_datasets/last_uploaded_dataset.csv
-uploaded_datasets/last_uploaded_meta.txt
-uploaded_datasets/last_source.txt
+venv/
+.env
+uploaded_datasets/
+uploads/persistent_*
+*.parquet
