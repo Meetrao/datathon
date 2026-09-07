@@ -531,49 +531,17 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Natural-Language Query -> Live Filtered View Search Bar
+# Natural-Language Live Data Filter Search Bar
 # ---------------------------------------------------------
-st.markdown("""
-<div style='background:#FFFFFF; border:1.5px solid #0284C7; border-radius:10px; padding:16px 20px; margin-bottom:20px; box-shadow:0 2px 6px rgba(2,132,199,0.06);'>
-    <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;'>
-        <div>
-            <span style='font-size:14px; font-weight:700; color:#0F172A;'>🔍 NATURAL-LANGUAGE LIVE DATA FILTER</span>
-            <span style='font-size:12px; color:#64748B; margin-left:8px;'>Type query to dynamically slice dataset in real-time</span>
-        </div>
-        <span class='status-chip-green'>LIVE DASHBOARD FILTER</span>
-    </div>
-""", unsafe_allow_html=True)
-
 if 'nl_filter_query' not in st.session_state:
     st.session_state['nl_filter_query'] = ""
 
-p_col1, p_col2, p_col3, p_col4, p_col5 = st.columns([1.5, 1.5, 1.5, 1.5, 1])
-preset_clicked = None
-with p_col1:
-    if st.button("📍 West Region", key="preset_west_btn", use_container_width=True):
-        preset_clicked = "show me the West region"
-with p_col2:
-    if st.button("💰 Orders > ₹5000", key="preset_orders_btn", use_container_width=True):
-        preset_clicked = "orders above 5000"
-with p_col3:
-    if st.button("👩 Female Patients", key="preset_female_btn", use_container_width=True):
-        preset_clicked = "female patients"
-with p_col4:
-    if st.button("⚡ Discount > 0.1", key="preset_discount_btn", use_container_width=True):
-        preset_clicked = "discount greater than 0.1"
-with p_col5:
-    if st.button("🔄 Clear", key="preset_clear_btn", use_container_width=True):
-        st.session_state['nl_filter_query'] = ""
-        st.rerun()
-
-if preset_clicked:
-    st.session_state['nl_filter_query'] = preset_clicked
-
 user_nl_filter = st.text_input(
-    "Natural-Language Query Search Bar:",
+    "Filter dataset with natural language:",
     value=st.session_state['nl_filter_query'],
     key="nl_filter_query_input",
-    placeholder="e.g. 'show me the West region', 'orders above ₹5000', 'female patients', 'sales under 1000'..."
+    placeholder="Type natural language filter (e.g. 'show me West region', 'orders above 5000', 'female patients', 'discount > 0.1')...",
+    label_visibility="collapsed"
 )
 
 filter_result = filter_dataset_by_nl(cleaned_df, col_types, user_nl_filter)
@@ -581,7 +549,7 @@ display_df = filter_result['filtered_df']
 
 if filter_result['applied_rules']:
     st.markdown(f"""
-    <div style='background:#E0F2FE; border:1px solid #7DD3FC; border-radius:6px; padding:10px 14px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;'>
+    <div style='background:#E0F2FE; border:1.5px solid #7DD3FC; border-radius:8px; padding:10px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;'>
         <div>
             <b style='color:#0369A1;'>FILTER ACTIVE:</b> <span style='color:#0F172A; font-size:13px;'>{filter_result['summary']}</span>
         </div>
@@ -591,15 +559,13 @@ if filter_result['applied_rules']:
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("</div>", unsafe_allow_html=True)
-
 # Main Dashboard Navigation Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 Executive Summary",
-    "🛡️ Data Audit & Cleaning",
-    "📈 Auto Visual Dashboard",
-    "🤖 Machine Learning Insights",
-    "💬 Conversational Assistant"
+    "Executive Summary",
+    "Data Audit & Cleaning",
+    "Auto Visual Dashboard",
+    "Machine Learning Insights",
+    "Conversational Assistant"
 ])
 
 # =========================================================
