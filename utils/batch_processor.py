@@ -28,6 +28,47 @@ def stream_file_to_disk(uploaded_file, target_path: str, chunk_size_bytes: int =
             
     return total_bytes
 
+def safe_read_csv(source, **kwargs) -> pd.DataFrame:
+    """
+    Robust CSV loader that auto-detects and cycles through encodings
+    ('utf-8', 'utf-8-sig', 'latin1', 'cp1252', 'iso-8859-1') and uses
+    encoding_errors='replace' to guarantee zero UnicodeDecodeError crashes.
+    """
+    encodings = ['utf-8', 'utf-8-sig', 'latin1', 'cp1252', 'iso-8859-1']
+    for enc in encodings:
+        try:
+            if hasattr(source, 'seek'):
+                source.seek(0)
+            return pd.read_csv(source, encoding=enc, **kwargs)
+        except (UnicodeDecodeError, LookupError):
+            continue
+        except Exception as e:
+            if 'codec' in str(e).lower() or 'decode' in str(e).lower():
+                continue
+            raise e
+    if hasattr(source, 'seek'):
+        source.seek(0)
+    return pd.read_csv(source, encoding_errors='replace', **kwargs)
+
+def safe_read_csv_chunks(file_path: str, batch_size: int, **kwargs):
+    """
+    Returns a chunk iterator for CSV streaming, auto-handling non-UTF-8 encodings.
+    """
+    encodings = ['utf-8', 'utf-8-sig', 'latin1', 'cp1252', 'iso-8859-1']
+    for enc in encodings:
+        try:
+            test_it = pd.read_csv(file_path, chunksize=batch_size, encoding=enc, low_memory=False, **kwargs)
+            # test reading first chunk
+            test_chunk = next(test_it)
+            return pd.read_csv(file_path, chunksize=batch_size, encoding=enc, low_memory=False, **kwargs)
+        except (UnicodeDecodeError, LookupError):
+            continue
+        except StopIteration:
+            return pd.read_csv(file_path, chunksize=batch_size, encoding=enc, low_memory=False, **kwargs)
+        except Exception:
+            break
+    return pd.read_csv(file_path, chunksize=batch_size, encoding_errors='replace', low_memory=False, **kwargs)
+
 class IncrementalStatsAccumulator:
     """
     Computes exact running aggregate statistics across multiple streaming batches
@@ -162,9 +203,8 @@ def process_dataset_in_batches(
         num_chunks = max(1, math.ceil(total_raw_rows / batch_size))
         chunk_iterator = [full_df.iloc[i*batch_size:(i+1)*batch_size] for i in range(num_chunks)]
     else:
-        # CSV Streaming iterator
-        # Count lines approximately or use chunksize
-        chunk_iterator = pd.read_csv(file_path, chunksize=batch_size, low_memory=False)
+        # CSV Streaming iterator with auto-encoding fallback
+        chunk_iterator = safe_read_csv_chunks(file_path, batch_size=batch_size)
         # Estimate total chunks from file size
         est_row_bytes = 120  # average bytes per row
         est_total_rows = max(batch_size, int(file_size_bytes / est_row_bytes)) if file_size_bytes > 0 else batch_size

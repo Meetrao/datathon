@@ -6,7 +6,7 @@ import time
 
 from utils.type_detector import detect_column_types
 from utils.cleaner import detect_and_clean
-from utils.batch_processor import process_dataset_in_batches, stream_file_to_disk
+from utils.batch_processor import process_dataset_in_batches, stream_file_to_disk, safe_read_csv
 from utils.rag_engine import DatasetRAGEngine
 from utils.ai_assistant import AIAssistantEngine
 from utils.ml_engine import run_ml_analysis
@@ -344,7 +344,7 @@ if data_source == "Practice Datasets":
         selected_dataset_name = "marketing_attribution.csv"
         
     if os.path.exists(active_file_path):
-        raw_df = pd.read_csv(active_file_path)
+        raw_df = safe_read_csv(active_file_path)
 
 else:
     uploaded_files = st.sidebar.file_uploader(
@@ -369,7 +369,7 @@ else:
                 active_file_path = saved_paths[0]
                 selected_dataset_name = file_names[0]
                 if active_file_path.endswith('.csv'):
-                    raw_df = pd.read_csv(active_file_path)
+                    raw_df = safe_read_csv(active_file_path)
                 elif active_file_path.endswith('.parquet'):
                     raw_df = pd.read_parquet(active_file_path)
                 else:
@@ -387,7 +387,7 @@ else:
                     for f_path, f_name in zip(saved_paths, file_names):
                         try:
                             if f_path.endswith('.csv'):
-                                temp_df = pd.read_csv(f_path)
+                                temp_df = safe_read_csv(f_path)
                             elif f_path.endswith('.parquet'):
                                 temp_df = pd.read_parquet(f_path)
                             else:
@@ -409,7 +409,7 @@ else:
                     active_file_path = saved_paths[chosen_idx]
                     selected_dataset_name = file_names[chosen_idx]
                     if active_file_path.endswith('.csv'):
-                        raw_df = pd.read_csv(active_file_path)
+                        raw_df = safe_read_csv(active_file_path)
                     elif active_file_path.endswith('.parquet'):
                         raw_df = pd.read_parquet(active_file_path)
                     else:
@@ -427,7 +427,7 @@ else:
         if os.path.exists(PERSISTENT_FILE):
             try:
                 active_file_path = PERSISTENT_FILE
-                raw_df = pd.read_csv(PERSISTENT_FILE)
+                raw_df = safe_read_csv(PERSISTENT_FILE)
                 if os.path.exists(PERSISTENT_META):
                     with open(PERSISTENT_META, 'r', encoding='utf-8') as f:
                         selected_dataset_name = f.read().strip()
