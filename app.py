@@ -530,34 +530,10 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# Natural-Language Live Data Filter Search Bar
-# ---------------------------------------------------------
 if 'nl_filter_query' not in st.session_state:
     st.session_state['nl_filter_query'] = ""
 
-user_nl_filter = st.text_input(
-    "Filter dataset with natural language:",
-    value=st.session_state['nl_filter_query'],
-    key="nl_filter_query_input",
-    placeholder="Type natural language filter (e.g. 'show me West region', 'orders above 5000', 'female patients', 'discount > 0.1')...",
-    label_visibility="collapsed"
-)
-
-filter_result = filter_dataset_by_nl(cleaned_df, col_types, user_nl_filter)
-display_df = filter_result['filtered_df']
-
-if filter_result['applied_rules']:
-    st.markdown(f"""
-    <div style='background:#E0F2FE; border:1.5px solid #7DD3FC; border-radius:8px; padding:10px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;'>
-        <div>
-            <b style='color:#0369A1;'>FILTER ACTIVE:</b> <span style='color:#0F172A; font-size:13px;'>{filter_result['summary']}</span>
-        </div>
-        <div>
-            <span class='badge-num'>FILTERED {filter_result['filtered_count']:,} / {filter_result['original_count']:,} ROWS ({filter_result['percentage']}%)</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+display_df = cleaned_df
 
 # Main Dashboard Navigation Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -827,7 +803,7 @@ with tab2:
         with exp_col1:
             csv_data = display_df.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="📥 Download Filtered Dataset (.CSV)",
+                label="Download Filtered Dataset (.CSV)",
                 data=csv_data,
                 file_name=f"filtered_{selected_dataset_name}.csv",
                 mime="text/csv",
@@ -837,7 +813,7 @@ with tab2:
             try:
                 parquet_data = display_df.to_parquet(index=False)
                 st.download_button(
-                    label="⚡ Download Filtered Dataset (.Parquet)",
+                    label="Download Filtered Dataset (.Parquet)",
                     data=parquet_data,
                     file_name=f"filtered_{selected_dataset_name}.parquet",
                     mime="application/octet-stream",
@@ -851,9 +827,35 @@ with tab2:
 # =========================================================
 with tab3:
     st.markdown("<h2 style='color:#0F172A; font-weight:800; margin-bottom:2px;'>Adaptive Visual Dashboard Engine</h2>", unsafe_allow_html=True)
-    st.markdown(f"<span style='color:#64748B; font-size:13px;'>Plotly WebGL Graphics · 4 Primary Plots Rendered Dynamically ({len(display_df):,} rows active)</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='color:#64748B; font-size:13px;'>Plotly WebGL Graphics · 4 Primary Plots Rendered Dynamically</span>", unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # ---------------------------------------------------------
+    # Natural-Language Live Data Filter Search Bar Inside Tab 3
+    # ---------------------------------------------------------
+    user_nl_filter = st.text_input(
+        "Filter dataset with natural language:",
+        value=st.session_state.get('nl_filter_query', ''),
+        key="nl_filter_query_input",
+        placeholder="Type natural language filter (e.g. 'show me West region', 'orders above 5000', 'female patients', 'discount > 0.1')...",
+        label_visibility="collapsed"
+    )
+
+    filter_result = filter_dataset_by_nl(cleaned_df, col_types, user_nl_filter)
+    display_df = filter_result['filtered_df']
+
+    if filter_result['applied_rules']:
+        st.markdown(f"""
+        <div style='background:#E0F2FE; border:1.5px solid #7DD3FC; border-radius:8px; padding:10px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;'>
+            <div>
+                <b style='color:#0369A1;'>FILTER ACTIVE:</b> <span style='color:#0F172A; font-size:13px;'>{filter_result['summary']}</span>
+            </div>
+            <div>
+                <span class='badge-num'>FILTERED {filter_result['filtered_count']:,} / {filter_result['original_count']:,} ROWS ({filter_result['percentage']}%)</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     col_chart1, col_chart2 = st.columns(2)
     with col_chart1:
@@ -882,7 +884,7 @@ with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Custom Chart Sandbox Card
-    with st.expander("🛠️ Custom Interactive Visual Explorer Sandbox", expanded=False):
+    with st.expander("Custom Interactive Visual Explorer Sandbox", expanded=False):
         all_columns = list(display_df.columns)
         numeric_columns = col_types.get('numeric', [])
 
@@ -905,6 +907,10 @@ with tab3:
             custom_color = st.selectbox("Color / Group By", color_options, index=0, key="custom_color")
         with sb_r2_c2:
             custom_agg = st.selectbox("Aggregation", ["Mean", "Sum", "Count", "Median"], key="custom_agg")
+
+        z_param = None
+        if custom_chart_type == "3D Scatter Plot":
+            z_param = st.selectbox("Z-Axis Feature (3D)", numeric_columns if numeric_columns else all_columns, key="custom_z")
 
         fig_custom = plot_custom_user_chart(display_df, custom_chart_type, custom_x, custom_y, custom_color, custom_agg, z_param)
         st.plotly_chart(fig_custom, key="custom_sandbox_chart", use_container_width=True)
