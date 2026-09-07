@@ -56,7 +56,6 @@ def filter_dataset_by_nl(df: pd.DataFrame, col_types: dict, user_query: str) -> 
     
     matches = num_op_regex.findall(query_raw)
     
-    matched_spans = []
     for match in matches:
         col_prefix, operator, num_str = match
         num_val = float(num_str.replace(',', ''))
@@ -66,7 +65,6 @@ def filter_dataset_by_nl(df: pd.DataFrame, col_types: dict, user_query: str) -> 
         target_col = None
         if col_prefix and col_prefix.strip():
             prefix_clean = col_prefix.strip().lower()
-            # Match against numeric columns
             for nc in numeric_cols:
                 nc_clean = nc.lower().replace('_', ' ')
                 if nc_clean in prefix_clean or prefix_clean in nc_clean or any(w in nc_clean for w in prefix_clean.split()):
@@ -74,14 +72,12 @@ def filter_dataset_by_nl(df: pd.DataFrame, col_types: dict, user_query: str) -> 
                     break
         
         if not target_col:
-            # Look anywhere in query for a numeric column name
             for nc in numeric_cols:
                 nc_clean = nc.lower().replace('_', ' ')
                 if nc_clean in query_lower:
                     target_col = nc
                     break
         
-        # Fallback to first numeric column if none matched
         if not target_col and numeric_cols:
             target_col = numeric_cols[0]
             
@@ -101,14 +97,11 @@ def filter_dataset_by_nl(df: pd.DataFrame, col_types: dict, user_query: str) -> 
     # -------------------------------------------------------------------
     # STEP 2: CATEGORICAL / TEXT MATCHING (e.g., "West region", "female", "electronics")
     # -------------------------------------------------------------------
-    # Clean query text by removing filler phrases
     clean_text_query = re.sub(
         r'\b(show me|filter|find|get|rows|where|display|the|dataset|records|with|that have|which have|list|all)\b',
         '', query_lower, flags=re.IGNORECASE
     ).strip()
     
-    # Check categorical column values in df
-    found_cat_match = False
     for cat_col in categorical_cols:
         if cat_col in df.columns:
             unique_vals = df[cat_col].dropna().unique()
@@ -118,13 +111,11 @@ def filter_dataset_by_nl(df: pd.DataFrame, col_types: dict, user_query: str) -> 
                     cond = df[cat_col].astype(str).str.contains(re.escape(u_val_str), case=False, na=False)
                     mask = mask & cond
                     applied_rules.append(f"`{cat_col}` == '{u_val_str}'")
-                    found_cat_match = True
 
     # -------------------------------------------------------------------
     # STEP 3: FALLBACK FULL-TEXT SEARCH (if no specific filter matched)
     # -------------------------------------------------------------------
     if not applied_rules and clean_text_query:
-        # Search across all object/string columns
         text_cols = [c for c in df.columns if df[c].dtype == 'object' or pd.api.types.is_string_dtype(df[c])]
         if text_cols:
             full_search_mask = pd.Series(False, index=df.index)
@@ -138,7 +129,6 @@ def filter_dataset_by_nl(df: pd.DataFrame, col_types: dict, user_query: str) -> 
                 mask = mask & full_search_mask
                 applied_rules.append(f"Text Search: '{clean_text_query}'")
 
-    # Apply final boolean mask
     filtered_df = df[mask].reset_index(drop=True)
     orig_len = len(df)
     filt_len = len(filtered_df)
@@ -157,4 +147,18 @@ def filter_dataset_by_nl(df: pd.DataFrame, col_types: dict, user_query: str) -> 
         "percentage": pct,
         "applied_rules": applied_rules,
         "summary": summary_str
+    }
+
+# Backward compatibility alias
+def query_dataset(df: pd.DataFrame, col_types: dict, user_query: str) -> dict:
+    """
+    Legacy wrapper for natural language filtering query engine.
+    """
+    res = filter_dataset_by_nl(df, col_types, user_query)
+    return {
+        "query": user_query,
+        "answer_title": "Filtered Dataset Query",
+        "answer_val": f"{res['filtered_count']:,} rows",
+        "explanation": res['summary'],
+        "filtered_df": res['filtered_df']
     }
